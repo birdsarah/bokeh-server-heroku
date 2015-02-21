@@ -6,10 +6,8 @@ import sys
 
 from six.moves.queue import Queue
 
-from bokeh.server.settings import settings as server_settings
 from bokeh.server.app import bokeh_app
-from bokeh.server.zmqpub import Publisher
-
+from bokeh.server.configure import StaticFilter
 from bokeh.server.server_backends import (
     InMemoryServerModelStorage,
     MultiUserAuthentication, RedisServerModelStorage, ShelveServerModelStorage,
@@ -18,14 +16,8 @@ from bokeh.server.server_backends import (
 from bokeh.server.serverbb import (
     InMemoryBackboneStorage, RedisBackboneStorage, ShelveBackboneStorage
 )
-
-
-class StaticFilter(logging.Filter):
-    def filter(self, record):
-        msg = record.getMessage()
-        return not msg.startswith(
-            ("200 GET /static", "200 GET /bokehjs/static")
-        )
+from bokeh.server.settings import settings as server_settings
+from bokeh.server.zmqpub import Publisher
 
 
 def configure_flask(config_argparse=None, config_file=None, config_dict=None):
