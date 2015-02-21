@@ -1,1 +1,1 @@
-web: gunicorn app:app --log-file - --log-level DEBUG -b 0.0.0.0:$PORT
+web: gunicorn app:tornado_app -k tornado --log-file - -b 0.0.0.0:$PORT

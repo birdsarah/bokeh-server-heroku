@@ -1,10 +1,9 @@
 import os, urlparse
 redis_url = urlparse.urlparse(os.environ.get('REDISCLOUD_URL', '127.0.0.1:6397'))
 
-
 pub_zmqaddr ="ipc:///tmp/0"
 sub_zmqaddr ="ipc:///tmp/1"
-run_forwarder = False
+run_forwarder = True
 model_backend = {'type' : 'redis',
                  'redis_host': redis_url.hostname,
                  'redis_port' : redis_url.port,

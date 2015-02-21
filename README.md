@@ -1,10 +1,15 @@
 ### To setup locally
 
+Add a new conda environment (I had problems with py34 on heroku, so using py27):
+
+    $ conda create -n env_name python=2.7
+
+Edit `config.py` as appropriate (e.g. comment out `model_backend` to use default non-redis)
+    
+Install requirements with conda, and start app
+
     $ conda install --file conda-requirements.txt
     $ foreman start
-
-Edit `config.py` as appropriate
-
 
 ### To setup on heroku
 
