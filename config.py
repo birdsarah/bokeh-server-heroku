@@ -10,4 +10,4 @@ model_backend = {'type' : 'redis',
                  'redis_password' : redis_url.password,
                  'start-redis' : False}
 secret_key = os.environ.get('BOKEH_SECRET_KEY', 'another secret key')
-multi_user = True
+multi_user = False
