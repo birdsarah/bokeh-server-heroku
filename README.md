@@ -15,7 +15,7 @@ Install requirements with conda, and start app
 
 Configure heroku to use the conda buildpack and add your secret keys:
 
-    $ heroku config:set BUILDPACK_URL=https://github.com/thenovices/heroku-buildpack-scipy
+    $ heroku config:set BUILDPACK_URL=https://github.com/kennethreitz/conda-buildpack.git
     $ heroku config:set FLASK_SECRET_KEY='an actually secret key'
     $ heroku config:set BOKEH_SECRET_KEY='another secret key'
 
