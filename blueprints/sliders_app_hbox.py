@@ -13,8 +13,12 @@ from bokeh.properties import Instance
 
 class SlidersApp(HBox):
 
-    extra_generated_classes = [["SlidersApp", "SlidersApp", "HBox"]]
+    """
+    Note these are not needed server side, because the server side code
+    doesn't use/reference them.
     js_model = "SlidersApp"
+    parent_model = "HBox"
+    """
 
     inputs = Instance(VBoxForm)
 
