@@ -1,9 +1,12 @@
 from __future__ import print_function
 import logging
+log = logging.getLogger(__name__)
+
 from os.path import dirname
 import imp
 import sys
 
+from six.moves.queue import Empty
 from six.moves.queue import Queue
 
 from bokeh.server.app import bokeh_app
@@ -18,6 +21,39 @@ from bokeh.server.serverbb import (
 )
 from bokeh.server.settings import settings as server_settings
 from bokeh.server.zmqpub import Publisher
+
+from threading import Thread
+
+import json
+import zmq
+
+timeout = 0.1
+
+import time
+
+
+class PingingPublisher(Publisher):
+    def start(self):
+        self.ping_thread = Thread(target=self.ping)
+        self.ping_thread.start()
+        super(PingingPublisher, self).start()
+
+    def ping(self):
+        socket = self.ctx.socket(zmq.PUB)
+        socket.connect(self.zmqaddr)
+        try:
+            while not self.kill:
+                try:
+                    message = json.dumps({"msg": "Keep Alive",
+                                          "topic": "test",
+                                          "exclude": []})
+                    log.warning('pinging')
+                    socket.send_string(str(message))
+                    time.sleep(10)
+                except Empty:
+                    pass
+        finally:
+            socket.close()
 
 
 def configure_flask(config_argparse=None, config_file=None, config_dict=None):
