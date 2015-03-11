@@ -94,7 +94,7 @@ def configure_flask(config_argparse=None, config_file=None, config_dict=None):
     else:
         authentication = MultiUserAuthentication()
     bokeh_app.url_prefix = server_settings.url_prefix
-    bokeh_app.publisher = Publisher(server_settings.ctx,
+    bokeh_app.publisher = PingingPublisher(server_settings.ctx,
                                     server_settings.pub_zmqaddr, Queue())
 
     for script in server_settings.scripts:
