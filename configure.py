@@ -115,8 +115,6 @@ class MySubscriber(object):
             sockets.append(socket)
             poller.register(socket, zmq.POLLIN)
         try:
-            import logging
-            log = logging.getLogger(__name__)
             while not self.kill:
                 socks = dict(poller.poll(timeout * 1000))
                 self.timer += 1
