@@ -6,7 +6,6 @@ from os.path import dirname
 import imp
 import sys
 
-from six.moves.queue import Empty
 from six.moves.queue import Queue
 
 from bokeh.server.app import bokeh_app
@@ -22,38 +21,21 @@ from bokeh.server.serverbb import (
 from bokeh.server.settings import settings as server_settings
 from bokeh.server.zmqpub import Publisher
 
-from threading import Thread
+from tornado.web import Application, FallbackHandler
+from tornado.wsgi import WSGIContainer
 
-import json
+from bokeh.server import websocket
+##bokeh_app is badly named - it's really a blueprint
+from bokeh.server.app import app
+from bokeh.server.models import convenience as mconv
+from bokeh.server.models import docs
+from bokeh.server.zmqsub import Subscriber
+from bokeh.server.forwarder import Forwarder
+
+from threading import Thread
 import zmq
 
 timeout = 0.1
-
-import time
-
-
-class PingingPublisher(Publisher):
-    def start(self):
-        self.ping_thread = Thread(target=self.ping)
-        self.ping_thread.start()
-        super(PingingPublisher, self).start()
-
-    def ping(self):
-        socket = self.ctx.socket(zmq.PUB)
-        socket.connect(self.zmqaddr)
-        try:
-            while not self.kill:
-                try:
-                    message = json.dumps({"msg": "Keep Alive",
-                                          "topic": "test",
-                                          "exclude": []})
-                    log.warning('pinging')
-                    socket.send_string(str(message))
-                    time.sleep(10)
-                except Empty:
-                    pass
-        finally:
-            socket.close()
 
 
 def configure_flask(config_argparse=None, config_file=None, config_dict=None):
@@ -94,7 +76,7 @@ def configure_flask(config_argparse=None, config_file=None, config_dict=None):
     else:
         authentication = MultiUserAuthentication()
     bokeh_app.url_prefix = server_settings.url_prefix
-    bokeh_app.publisher = PingingPublisher(server_settings.ctx,
+    bokeh_app.publisher = Publisher(server_settings.ctx,
                                     server_settings.pub_zmqaddr, Queue())
 
     for script in server_settings.scripts:
@@ -105,9 +87,111 @@ def configure_flask(config_argparse=None, config_file=None, config_dict=None):
         print("importing %s" % script)
         imp.load_source("_bokeh_app", script)
 
+    log.warning('Setup')
     bokeh_app.setup(
         backend,
         bbstorage,
         servermodel_storage,
         authentication,
     )
+
+
+class MySubscriber(object):
+    def __init__(self, ctx, addrs, wsmanager):
+        self.ctx = ctx
+        self.addrs = addrs
+        self.wsmanager = wsmanager
+        self.kill = False
+        self.timer = 0
+
+    def run(self):
+        sockets = []
+        poller = zmq.Poller()
+        for addr in self.addrs:
+            socket = self.ctx.socket(zmq.SUB)
+            socket.connect(addr)
+            socket.setsockopt_string(zmq.SUBSCRIBE, u"")
+            sockets.append(socket)
+            poller.register(socket, zmq.POLLIN)
+        try:
+            import logging
+            log = logging.getLogger(__name__)
+            while not self.kill:
+                socks = dict(poller.poll(timeout * 1000))
+                self.timer += 1
+                if self.timer > 100:
+                    log.warning(self.timer)
+                    self.wsmanager.send("DEBUG", "Keep Alive", exclude=[])
+                    self.timer = 0
+                for socket, v in socks.items():
+                    msg = socket.recv_json()
+                    topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
+                    self.wsmanager.send(topic, msg, exclude=exclude)
+        except zmq.ContextTerminated:
+            pass
+        finally:
+            for s in sockets:
+                s.close()
+
+    def start(self):
+        self.thread = Thread(target=self.run)
+        self.thread.start()
+
+    def stop(self):
+        self.kill = True
+
+
+class SBTA(Application):
+    def __init__(self, flask_app, **settings):
+        self.flask_app = flask_app
+        tornado_flask = WSGIContainer(flask_app)
+        url_prefix = server_settings.url_prefix
+        handlers = [
+            (url_prefix + "/bokeh/sub", websocket.WebSocketHandler),
+            (r".*", FallbackHandler, dict(fallback=tornado_flask))
+        ]
+        super(SBTA, self).__init__(handlers, **settings)
+        self.wsmanager = websocket.WebSocketManager()
+
+        def auth(auth, docid):
+            #HACKY
+            if docid.startswith("temporary-"):
+                return True
+            doc = docs.Doc.load(bokeh_app.servermodel_storage, docid)
+            status = mconv.can_read_doc_api(doc, auth)
+            return status
+        self.wsmanager.register_auth('bokehplot', auth)
+        log.warning('CONN')
+
+        self.subscriber = MySubscriber(server_settings.ctx,
+                                       [server_settings.sub_zmqaddr],
+                                       self.wsmanager)
+        if server_settings.run_forwarder:
+            self.forwarder = Forwarder(server_settings.ctx,
+                                       server_settings.pub_zmqaddr,
+                                       server_settings.sub_zmqaddr)
+        else:
+            self.forwarder = None
+
+    def start_threads(self):
+        bokeh_app.publisher.start()
+        self.subscriber.start()
+        if self.forwarder:
+            self.forwarder.start()
+
+    def stop_threads(self):
+        bokeh_app.publisher.stop()
+        self.subscriber.stop()
+        if self.forwarder:
+            self.forwarder.stop()
+
+
+def make_tornado_app(flask_app=None):
+    if flask_app is None:
+        flask_app = app
+    if server_settings.debug:
+        flask_app.debug = True
+    flask_app.secret_key = server_settings.secret_key
+    tornado_app = SBTA(flask_app, debug=server_settings.debug)
+    tornado_app.start_threads()
+    return tornado_app

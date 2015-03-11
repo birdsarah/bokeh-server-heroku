@@ -1,6 +1,6 @@
-from configure import configure_flask
+from configure import configure_flask, make_tornado_app
 from bokeh.server.app import app
-from bokeh.server.configure import make_tornado_app, register_blueprint
+from bokeh.server.configure import register_blueprint
 
 configure_flask(config_file='config.py')
 register_blueprint()
