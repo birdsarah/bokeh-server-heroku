@@ -121,8 +121,9 @@ class MySubscriber(object):
                 if self.timer > 100:
                     log.warning(self.timer)
                     msg = self.keep_message
-                    topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
-                    self.wsmanager.send(topic, msg, exclude=exclude)
+                    if msg:
+                        topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
+                        self.wsmanager.send(topic, msg, exclude=exclude)
                     self.timer = 0
                 for socket, v in socks.items():
                     msg = socket.recv_json()
