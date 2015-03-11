@@ -37,6 +37,8 @@ import zmq
 
 timeout = 0.1
 
+import time
+import json
 
 def configure_flask(config_argparse=None, config_file=None, config_dict=None):
     if config_argparse:
@@ -103,7 +105,7 @@ class MySubscriber(object):
         self.wsmanager = wsmanager
         self.kill = False
         self.timer = 0
-        self.keep_message = None
+        self.keep_alive_queue = {}
 
     def run(self):
         sockets = []
@@ -118,17 +120,24 @@ class MySubscriber(object):
             while not self.kill:
                 socks = dict(poller.poll(timeout * 1000))
                 self.timer += 1
-                if self.timer > 100:
-                    log.warning(self.timer)
-                    msg = self.keep_message
-                    if msg:
-                        topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
-                        self.wsmanager.send(topic, msg, exclude=exclude)
+                # Ping from the server every ~40s (keeps heroku alive)
+                if self.timer > 400:
                     self.timer = 0
+                    currenttime = time.time()
+                    for topic, timestamp in self.keep_alive_queue.items():
+                        # Stop sending keep alives after 4 minutes.
+                        if currenttime - timestamp > (60 * 4):
+                            del self.keep_alive_queue[topic]
+                        else:
+                            self.wsmanager.send(
+                                topic,
+                                json.dumps({"msgtype": "Keep Alive"}),
+                                exclude=[]
+                            )
                 for socket, v in socks.items():
                     msg = socket.recv_json()
-                    self.keep_message = msg
                     topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
+                    self.keep_alive_queue[topic] = time.time()
                     self.wsmanager.send(topic, msg, exclude=exclude)
         except zmq.ContextTerminated:
             pass
