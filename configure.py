@@ -103,6 +103,7 @@ class MySubscriber(object):
         self.wsmanager = wsmanager
         self.kill = False
         self.timer = 0
+        self.keep_message = None
 
     def run(self):
         sockets = []
@@ -121,10 +122,13 @@ class MySubscriber(object):
                 self.timer += 1
                 if self.timer > 100:
                     log.warning(self.timer)
-                    self.wsmanager.send("DEBUG", "Keep Alive", exclude=[])
+                    msg = self.keep_message
+                    topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
+                    self.wsmanager.send(topic, msg, exclude=exclude)
                     self.timer = 0
                 for socket, v in socks.items():
                     msg = socket.recv_json()
+                    self.keep_message = msg
                     topic, msg, exclude = msg['topic'], msg['msg'], msg['exclude']
                     self.wsmanager.send(topic, msg, exclude=exclude)
         except zmq.ContextTerminated:
