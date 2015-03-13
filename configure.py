@@ -133,7 +133,7 @@ class PingingSubscriber(Subscriber):
         try:
             while not self.kill:
                 socks = dict(poller.poll(timeout * 1000))
-                self.handle_keepalive()
+                self.handle_keepalive(log)
                 self.process_messages(socks)
         except zmq.ContextTerminated:
             pass
