@@ -96,7 +96,7 @@ class PingingSubscriber(Subscriber):
         self.timer = 0
         super(PingingSubscriber, self).__init__(ctx, addrs, wsmanager)
 
-    def handle_keepalive(self):
+    def handle_keepalive(self, log):
         self.timer += 1
         # Ping from the server every ~40s (keeps heroku alive)
         if self.timer > 400:
@@ -107,6 +107,7 @@ class PingingSubscriber(Subscriber):
                 if currenttime - timestamp > (60 * 30):
                     del self.keep_alive_queue[topic]
                 else:
+                    log.warning("Keep Alive ping sent")
                     self.wsmanager.send(
                         topic,
                         json.dumps({"msgtype": "Keep Alive"}),
@@ -122,6 +123,7 @@ class PingingSubscriber(Subscriber):
     def run(self):
         sockets = []
         poller = zmq.Poller()
+        log = logging.getLogger(__name__)
         for addr in self.addrs:
             socket = self.ctx.socket(zmq.SUB)
             socket.connect(addr)
