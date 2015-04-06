@@ -1,6 +1,6 @@
 from bokeh.models import ColumnDataSource
 from bokeh.properties import Instance
-from bokeh.models.widgets import Slider, VBox
+from bokeh.models.widgets import Slider, VBox, TextInput
 
 # update_active_data and get_frame_for_country are exact copies of
 # methods used in client app (under map_data.py)
@@ -30,38 +30,78 @@ def update_active_data(data, active_year, palette_name=None):
     return data
 
 
-def get_frame_for_country(frame, country):
-    return frame[frame.name == country]
+def get_frame_for_country(frame, country_name):
+    return frame[frame.name == country_name]
 
 
 class WashmapApp(VBox):
     year = Instance(Slider)
 
-    wat_source = Instance(ColumnDataSource)
-    san_source = Instance(ColumnDataSource)
-    wat_source_single = Instance(ColumnDataSource)
-    san_source_single = Instance(ColumnDataSource)
+    current_country = Instance(TextInput)
+
+    wat_source_map = Instance(ColumnDataSource)
+    san_source_map = Instance(ColumnDataSource)
+    wat_source_line = Instance(ColumnDataSource)
+    san_source_line = Instance(ColumnDataSource)
+    wat_source_text = Instance(ColumnDataSource)
+    san_source_text = Instance(ColumnDataSource)
 
     def setup_events(self):
         self.year.on_change('value', self, 'change_year')
-
-    def _get_df_for_country(self, frame, country):
-        return frame[frame.name == country]
-
-    def get_dfs(self):
-        wat_data = self.wat_source.to_df()
-        san_data = self.san_source.to_df()
-        return wat_data, san_data
-
-    def get_single_dfs(self, wat_data, san_data, country):
-        wat_data_single = get_frame_for_country(wat_data, country)
-        san_data_single = get_frame_for_country(san_data, country)
-        return wat_data_single, san_data_single
+        self.wat_source_map.on_change('selected', self, 'change_country')
+        self.san_source_map.on_change('selected', self, 'change_country')
 
     def change_year(self, obj, attrname, old, new):
-        wat_df, san_df = self.get_dfs()
         year = str(self.year.value)
+        wat_data, san_data = self._set_map_source(year)
+        self._set_text_source(wat_data, san_data)
+
+    def change_country(self, obj, attrname, old, new):
+        source_index = new[0]
+        country_name = obj.data['name'][source_index]
+        self.current_country.value = country_name
+        wat_df, san_df = self.get_dfs()
+        wat_data_text, san_data_text = self._set_text_source(wat_df, san_df)
+        self._set_line_source(wat_data_text, san_data_text)
+
+    def _set_map_source(self, year):
+        wat_df, san_df = self.get_dfs()
         wat_data = update_active_data(wat_df, year, palette_name='water')
         san_data = update_active_data(san_df, year, palette_name='sanitation')
-        self.wat_source.data = ColumnDataSource(wat_data).data
-        self.san_source.data = ColumnDataSource(san_data).data
+
+        self.wat_source_map.data = ColumnDataSource(wat_data).data
+        self.san_source_map.data = ColumnDataSource(san_data).data
+        return wat_data, san_data
+
+    def _set_text_source(self, wat_data, san_data):
+        wat_data_text, san_data_text = self.get_single_dfs(
+            wat_data, san_data, self.current_country.value
+        )
+        self.wat_source_text.data = ColumnDataSource(wat_data_text).data
+        self.san_source_text.data = ColumnDataSource(san_data_text).data
+        return wat_data_text, san_data_text
+
+    def _set_line_source(self, wat_data_text, san_data_text):
+        year_range = [str(x) for x in range(1990, 2013)]
+
+        wat_data_line = wat_data_text[year_range].transpose()
+        wat_data_line.columns = ['value']
+        wat_data_line = wat_data_line[wat_data_line['value'] > 0]
+
+        san_data_line = san_data_text[year_range].transpose()
+        san_data_line.columns = ['value']
+        san_data_line = san_data_line[san_data_line['value'] > 0]
+
+        self.wat_source_line.data = ColumnDataSource(wat_data_line).data
+        self.san_source_line.data = ColumnDataSource(san_data_line).data
+        return wat_data_line, san_data_line
+
+    def get_dfs(self):
+        wat_data = self.wat_source_map.to_df()
+        san_data = self.san_source_map.to_df()
+        return wat_data, san_data
+
+    def get_single_dfs(self, wat_data, san_data, country_id):
+        wat_data_single = get_frame_for_country(wat_data, country_id)
+        san_data_single = get_frame_for_country(san_data, country_id)
+        return wat_data_single, san_data_single
