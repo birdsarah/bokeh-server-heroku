@@ -2,6 +2,9 @@ from bokeh.models import ColumnDataSource
 from bokeh.properties import Instance
 from bokeh.models.widgets import Slider, VBox, TextInput
 
+import logging
+log = logging.getLogger(__name__)
+
 # update_active_data and get_frame_for_country are exact copies of
 # methods used in client app (under map_data.py)
 
@@ -48,21 +51,30 @@ class WashmapApp(VBox):
 
     def setup_events(self):
         self.year.on_change('value', self, 'change_year')
-        self.wat_source_map.on_change('selected', self, 'change_country')
-        self.san_source_map.on_change('selected', self, 'change_country')
+        self.wat_source_map.on_change('selected', self, 'change_country_wat')
+        self.san_source_map.on_change('selected', self, 'change_country_san')
 
     def change_year(self, obj, attrname, old, new):
         year = str(self.year.value)
         wat_data, san_data = self._set_map_source(year)
         self._set_text_source(wat_data, san_data)
 
+    def change_country_wat(self, obj, attrname, old, new):
+        self.change_country(obj, attrname, old, new)
+        self.san_source_map.selected = self.wat_source_map.selected
+
+    def change_country_san(self, obj, attrname, old, new):
+        self.change_country(obj, attrname, old, new)
+        self.wat_source_map.selected = self.san_source_map.selected
+
     def change_country(self, obj, attrname, old, new):
         source_index = new[0]
         country_name = obj.data['name'][source_index]
-        self.current_country.value = country_name
         wat_df, san_df = self.get_dfs()
         wat_data_text, san_data_text = self._set_text_source(wat_df, san_df)
         self._set_line_source(wat_data_text, san_data_text)
+        # select the countries
+        self.current_country.value = country_name
 
     def _set_map_source(self, year):
         wat_df, san_df = self.get_dfs()
