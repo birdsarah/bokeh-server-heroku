@@ -60,10 +60,16 @@ class WashmapApp(VBox):
         self._set_text_source(wat_data, san_data)
 
     def change_country_wat(self, obj, attrname, old, new):
+        if new == []:
+            new = [30]
+            self.wat_source_map.selected = new
         self.change_country(obj, attrname, old, new)
         self.san_source_map.selected = self.wat_source_map.selected
 
     def change_country_san(self, obj, attrname, old, new):
+        if new == []:
+            new = [30]
+            self.san_source_map.selected = new
         self.change_country(obj, attrname, old, new)
         self.wat_source_map.selected = self.san_source_map.selected
 
