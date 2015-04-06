@@ -74,7 +74,7 @@ class WashmapApp(VBox):
         self.wat_source_map.selected = self.san_source_map.selected
 
     def change_country(self, obj, attrname, old, new):
-        source_index = new[0]
+        source_index = new[-1]
         country_name = obj.data['name'][source_index]
         wat_df, san_df = self.get_dfs()
         wat_data_text, san_data_text = self._set_text_source(wat_df, san_df)
