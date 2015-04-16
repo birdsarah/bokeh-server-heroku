@@ -1,6 +1,7 @@
 from bokeh.models import ColumnDataSource
 from bokeh.properties import Instance
 from bokeh.models.widgets import Slider, VBox, TextInput
+from pandas import DataFrame
 
 import logging
 log = logging.getLogger(__name__)
@@ -8,33 +9,10 @@ log = logging.getLogger(__name__)
 # update_active_data and get_frame_for_country are exact copies of
 # methods used in client app (under map_data.py)
 
-from numpy import where
+from numpy import where, take
 WATER_COLOR_RANGE = ["#8c9494", "#8398a2", "#7c9baa", "#73a1b4", "#6aa6bd", "#62abc7", "#5aafd0", "#52b4d9", "#49bae4", "#3fc0f0"]  # nopep8
 SANITATION_COLOR_RANGE = ["#d45500", "#da670f", "#eb7e1f", "#eb941f", "#ebb01f", "#f2c83d", "#d3cc4f", "#86c26f", "#4db181", "#15b598"]  # nopep8
 GRAY = "#CCCCCC"
-
-
-def update_active_data(data, active_year, palette_name=None):
-    # Default to water
-    palette = WATER_COLOR_RANGE
-    if palette_name == 'sanitation':
-        palette = SANITATION_COLOR_RANGE
-
-    def _get_color(value):
-        if value < 0:
-            return GRAY
-        index = int(value / 10)
-        return palette[index]
-
-    data['active_year'] = active_year
-    data['active_year_value'] = data[active_year]
-    data['color_for_active_year'] = data[active_year].apply(_get_color)
-    data['active_year_value'] = where(data['active_year_value'] < 0, '-', data['active_year_value'])  # nopep8
-    return data
-
-
-def get_frame_for_country(frame, country_name):
-    return frame[frame.name == country_name]
 
 
 class WashmapApp(VBox):
@@ -42,84 +20,74 @@ class WashmapApp(VBox):
 
     current_country = Instance(TextInput)
 
-    wat_source_map = Instance(ColumnDataSource)
-    san_source_map = Instance(ColumnDataSource)
-    wat_source_line = Instance(ColumnDataSource)
-    san_source_line = Instance(ColumnDataSource)
-    wat_source_text = Instance(ColumnDataSource)
-    san_source_text = Instance(ColumnDataSource)
+    source = Instance(ColumnDataSource)
+    wat_all = Instance(ColumnDataSource)
+    san_all = Instance(ColumnDataSource)
+    line_source = Instance(ColumnDataSource)
 
     def setup_events(self):
-        self.year.on_change('value', self, 'change_year')
-        self.wat_source_map.on_change('selected', self, 'change_country_wat')
-        self.san_source_map.on_change('selected', self, 'change_country_san')
+#        self.year.on_change('value', self, 'change_year')
+        self.source.on_change('selected', self, 'change_line_source')
 
     def change_year(self, obj, attrname, old, new):
         year = str(self.year.value)
-        wat_data, san_data = self._set_map_source(year)
-        self._set_text_source(wat_data, san_data)
+        data = DataFrame(self.source.data)
+        new_data = self._update_data_for_new_year(data, year)
+        self.source.data = ColumnDataSource(new_data).data
 
-    def change_country_wat(self, obj, attrname, old, new):
+    def change_line_source(self, obj, attrname, old, new):
         if new == []:
+            # if no country selected, default to Morocco
             new = [30]
-            self.wat_source_map.selected = new
-        self.change_country(obj, attrname, old, new)
-        self.san_source_map.selected = self.wat_source_map.selected
+            self.source.selected = new
+        country_name = take(obj.data['name'], new)
+        # np gives us an array, assuming only one country
+        country_name = country_name[0]
+        new_line_data = self._get_line_data_for_country(country_name)
+        self.line_source.data = ColumnDataSource(new_line_data).data
 
-    def change_country_san(self, obj, attrname, old, new):
-        if new == []:
-            new = [30]
-            self.san_source_map.selected = new
-        self.change_country(obj, attrname, old, new)
-        self.wat_source_map.selected = self.san_source_map.selected
+    def get_wat_san_dfs(self):
+        wat_all_df = DataFrame(self.wat_all.data)
+        wat_all_df = wat_all_df.drop('index', axis=1)
+        san_all_df = DataFrame(self.san_all.data)
+        san_all_df = san_all_df.drop('index', axis=1)
+        return wat_all_df, san_all_df
 
-    def change_country(self, obj, attrname, old, new):
-        source_index = new[-1]
-        country_name = obj.data['name'][source_index]
-        wat_df, san_df = self.get_dfs()
-        wat_data_text, san_data_text = self._set_text_source(wat_df, san_df)
-        self._set_line_source(wat_data_text, san_data_text)
-        # select the countries
-        self.current_country.value = country_name
+    def _get_line_data_for_country(self, country_name):
+        # filter wat and san to get just that country
+        wat_all_df, san_all_df = self.get_wat_san_dfs()
+        new_wat_data = wat_all_df[wat_all_df.name == country_name]
+        new_san_data = san_all_df[san_all_df.name == country_name]
+        new_data = new_wat_data.merge(new_san_data, on='year')
+        return new_data
 
-    def _set_map_source(self, year):
-        wat_df, san_df = self.get_dfs()
-        wat_data = update_active_data(wat_df, year, palette_name='water')
-        san_data = update_active_data(san_df, year, palette_name='sanitation')
-
-        self.wat_source_map.data = ColumnDataSource(wat_data).data
-        self.san_source_map.data = ColumnDataSource(san_data).data
-        return wat_data, san_data
-
-    def _set_text_source(self, wat_data, san_data):
-        wat_data_text, san_data_text = self.get_single_dfs(
-            wat_data, san_data, self.current_country.value
+    def _update_data_for_new_year(self, data, year):
+        data = data.drop(
+            ['wat_value', 'san_value', 'wat_color', 'san_color'], axis=1
         )
-        self.wat_source_text.data = ColumnDataSource(wat_data_text).data
-        self.san_source_text.data = ColumnDataSource(san_data_text).data
-        return wat_data_text, san_data_text
+        data.year = year
+        wat_all_df, san_all_df = self.get_wat_san_dfs()
+        data = data.merge(wat_all_df, how='left')
+        data = data.merge(san_all_df, how='left')
+        data = data.fillna(-99)
 
-    def _set_line_source(self, wat_data_text, san_data_text):
-        year_range = [str(x) for x in range(1990, 2013)]
+        colored_df = self._color_data(data)
+        colored_df.head()
+        return colored_df
 
-        wat_data_line = wat_data_text[year_range].transpose()
-        wat_data_line.columns = ['value']
-        wat_data_line = wat_data_line[wat_data_line['value'] > 0]
+    def _color_data(self, data):
+        def _get_color(value, palette):
+            if value < 0:
+                return GRAY
+            index = int((value - 0.01) / 10)
+            return palette[index]
 
-        san_data_line = san_data_text[year_range].transpose()
-        san_data_line.columns = ['value']
-        san_data_line = san_data_line[san_data_line['value'] > 0]
-
-        self.wat_source_line.data = ColumnDataSource(wat_data_line).data
-        self.san_source_line.data = ColumnDataSource(san_data_line).data
-        return wat_data_line, san_data_line
-
-    def get_dfs(self):
-        wat_data = self.wat_source_map.to_df()
-        san_data = self.san_source_map.to_df()
-        return wat_data, san_data
-
-    def get_single_dfs(self, wat_data, san_data, country_id):
-        wat_data_single = get_frame_for_country(wat_data, country_id)
-        san_data_single = get_frame_for_country(san_data, country_id)
-        return wat_data_single, san_data_single
+        data['wat_color'] = data['wat_value'].apply(
+            _get_color, args=([WATER_COLOR_RANGE])
+        )
+        data['san_color'] = data['san_value'].apply(
+            _get_color, args=([SANITATION_COLOR_RANGE])
+        )
+        data['wat_value'] = where(data['wat_value'] < 0, '-', data['wat_value'])  # nopep8
+        data['san_value'] = where(data['san_value'] < 0, '-', data['san_value'])  # nopep8
+        return data
