@@ -26,7 +26,7 @@ class WashmapApp(VBox):
     line_source = Instance(ColumnDataSource)
 
     def setup_events(self):
-#        self.year.on_change('value', self, 'change_year')
+        self.year.on_change('value', self, 'change_year')
         self.source.on_change('selected', self, 'change_line_source')
 
     def change_year(self, obj, attrname, old, new):
