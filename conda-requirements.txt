@@ -7,6 +7,7 @@ flask=0.10.1=py27_1
 gevent=1.0.1=py27_0
 gevent-websocket=0.9.3=py27_0
 greenlet=0.4.5=py27_0
+gunicorn=19.1.0=py27_0
 itsdangerous=0.24=py27_0
 jinja2=2.7.3=py27_1
 libsodium=0.4.5=0
@@ -14,6 +15,7 @@ markupsafe=0.23=py27_0
 numpy=1.9.2=py27_0
 openssl=1.0.1k=1
 pandas=0.16.0=np19py27_1
+pastedeploy=1.5.2=py27_1
 pip=6.1.1=py27_0
 pygments=2.0.2=py27_0
 python=2.7.9=2
@@ -22,6 +24,8 @@ pytz=2015.2=py27_0
 pyyaml=3.11=py27_0
 pyzmq=14.5.0=py27_0
 readline=6.2=2
+redis=2.6.9=0
+redis-py=2.10.3=py27_0
 requests=2.6.0=py27_0
 setuptools=15.0=py27_0
 six=1.9.0=py27_0
