@@ -1,0 +1,2 @@
+# Packages to be installed from bokeh/dev
+bokeh=0.9.0dev.59382482=np19py27_1
