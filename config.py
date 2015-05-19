@@ -1,6 +1,7 @@
 import os, urlparse
 redis_url = urlparse.urlparse(os.environ.get('REDISCLOUD_URL', '127.0.0.1:6397'))
 
+ws_conn_string = "wss://%s/bokeh/sub" % (os.environ.get('HOSTNAME'))
 pub_zmqaddr = "ipc:///tmp/0"
 sub_zmqaddr = "ipc:///tmp/1"
 run_forwarder = True
