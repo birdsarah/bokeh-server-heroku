@@ -1,3 +1,11 @@
+# this repo is now out of date
+
+Bokeh has had it's server completely re-written. This repo is no longer relevant and I do not recommend using it.
+
+Please see the new bokeh docs for the new server: http://bokeh.pydata.org/en/latest/docs/user_guide/server.html
+
+
+
 ### To setup locally
 
 Add a new conda environment (I had problems with py34 on heroku, so using py27):
